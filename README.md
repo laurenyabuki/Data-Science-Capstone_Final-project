@@ -8,8 +8,6 @@ A Shiny app that takes as input a phrase (multiple words) in a text box input an
 The data corpus for this project can be downloaded from (https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
 The data was cleaned using the tm, quanteda packages. These packages has various inbult functions for removing common puntuation, stopswords, numbers, twitter handles etc.The clean data was then combined together for furthur analysis.A sample of 10 percent of the data was used for the project. The N- Grams were created using tokenization. The model algorithm uses the stupid back-off strategy for words prediction.
 
-The final project was concluded with one Shiny application and a Pitch using R-Presentation.
-
-The entire project is available on the GitHub repo: 
-
-Presentation Slide decks are available on the RPubs page: 
+Final project submission (Shiny App):
+Final project submission (Presentation):
+Source code files available on GitHub:
