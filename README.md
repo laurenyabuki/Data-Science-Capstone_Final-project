@@ -10,4 +10,4 @@ The data was cleaned using the tm, quanteda packages. These packages has various
 
 Final project submission (Shiny App):
 Final project submission (Presentation):
-Source code files available on GitHub:
+Source code files available on GitHub:https://github.com/laurenyabuki/Data-Science-Capstone_Final-project
