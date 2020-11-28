@@ -1,0 +1,173 @@
+---
+title: "Coursera Data Science Capstone: Final Course Project"
+author: "Lauren Yabuki"
+date: "28/11/2020"
+output:
+  word_document: default
+  html_document: default
+---
+# Synopsis 
+
+This project presents an algorithm model for forecasting next word in the Shiny application, using the SwiftKey database, made available by Coursera during the Data Science Capstone course.
+
+# Loading packages
+```{r warning=FALSE}
+library(tm)
+library(RWeka)
+library(SnowballC) # important for the wordcloud package use
+library(wordcloud)
+library (stringi) # string/text manipulation
+library(rvest) # reading html
+```
+
+# Data aquisition
+
+Download the data set from twitter, blogs and news
+
+```{r}
+if(!file.exists("./final/en_US/en_US.blogs.txt") &&
+   !file.exists("./final/en_US/en_US.news.txt") && 
+    !file.exists("./final/en_US/en_US.twitter.txt")){
+  URL <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+  download.file(URL, destfile="Coursera-SwiftKey.zip")
+  unzip(zipfile="Coursera-SwiftKey.zip")
+}
+```
+
+Opening connections and reading txt files
+
+```{r warning=FALSE}
+## twitter
+con_twitter <- file("./final/en_US/en_US.twitter.txt")
+twitter_raw <- readLines(con_twitter, encoding = "UTF-8", skipNul = TRUE)
+close(con_twitter)
+
+## news
+con_news <- file("./final/en_US/en_US.news.txt",open="r")
+news_raw <- readLines(con_news, encoding = "UTF-8", skipNul = TRUE) 
+close(con_news)
+
+## blogs
+con_blogs<-file("./final/en_US/en_US.blogs.txt", open="r")
+blogs_raw <- readLines(con_blogs, encoding = "UTF-8", skipNul = TRUE) 
+close(con_blogs)
+
+rm(con_blogs,con_news,con_twitter)
+```
+
+# Data processing
+
+Before processing the data, it is convenient to remove weird characters first. For that, data is converted from codepage Latin to ASCII.
+
+```{r message=FALSE, warning=FALSE}
+twitter_clean <- iconv(twitter_raw, 'UTF-8', 'ASCII', "byte")
+blogs_clean<- iconv(blogs_raw, 'UTF-8', 'ASCII', "byte")
+news_clean <- iconv(news_raw, 'UTF-8', 'ASCII', "byte")
+```
+
+# Data selection
+
+Next, given the large number of lines within the files, 0,1% of the data will be sampled. The samples of which file will be combined into one document, which will be converted to corpus. Corpora are collections of documents containing (natural language) text.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(333)
+
+twitter_sample <- sample(twitter_clean, length(twitter_clean)*0.001)
+
+blogs_sample <- sample(blogs_clean, length(blogs_clean)*0.001)
+
+news_sample <- sample(news_clean, length(news_clean)*0.001)
+
+all <- c(twitter_sample,blogs_sample,news_sample)
+all_corpus <- VCorpus(VectorSource(all))
+
+rm(twitter_clean,twitter_raw,twitter_sample)
+rm(blogs_clean,blogs_raw,blogs_sample)
+rm(news_clean,news_raw,news_sample)
+```
+
+# Text Mining
+
+All characteres that can't agreggate any meaning for the Natural Language processing that the corpus might contain must be cleaned.
+
+```{r message=FALSE, warning=FALSE}
+all_corpus <- tm_map(all_corpus, content_transformer(tolower))
+all_corpus <- tm_map(all_corpus, removePunctuation)
+all_corpus <- tm_map(all_corpus, removeNumbers)
+all_corpus <- tm_map(all_corpus, stripWhitespace)
+```
+
+# Tokeninzation
+
+Up to now, the data has been sampled and some characters have been removed. However, all the inputs and output we have been working on were strings. Even the word counting was performed on strings by means of a word break iterator. Now, it is time to perform tokenization of the data.
+
+# The main goal in working with this data is to create a Shiny app to predict the next word from the n-grams varying of one-gram to four-grams previous words.
+
+```{r}
+bi_tokenizer <- function(x){
+                    NGramTokenizer(x, Weka_control(min = 2, max = 2))}
+tri_tokenizer <-function(x){
+                    NGramTokenizer(x, Weka_control(min = 3, max = 3))}
+quad_tokenizer <-function(x){
+                    NGramTokenizer(x, Weka_control(min = 4, max = 4))}
+```
+
+# Create Term Document Matrices 
+
+Constructs or coerces to a term-document matrix or a document-term matrix.
+
+```{r}
+uni_tdm <- TermDocumentMatrix(all_corpus)
+bi_tdm <- TermDocumentMatrix(all_corpus, control = list(tokenize = bi_tokenizer))
+tri_tdm <-TermDocumentMatrix(all_corpus, control = list(tokenize = tri_tokenizer))
+quad_tdm <-TermDocumentMatrix(all_corpus, control = list(tokenize = quad_tokenizer))
+```
+
+# Frequency of words
+
+Counting n-gram frequencies and sorting them in decresing order, then storing the results into a data frame. For that, TermDocumentMatrix() output, which is a list, must be coerced to a matrix, so that, the frequency of each word can be summed by rowSums() and the data can be arranged in decresing order by sort(). After that, the output, which is a named number, can be used to create a data frame with the variable "names" storing the words and "freq" storing the frequency of each word.
+
+```{r}
+uni_matrix <- as.matrix(removeSparseTerms(uni_tdm, sparse = 0.999))
+bi_matrix <- as.matrix(removeSparseTerms(bi_tdm, sparse = 0.999))
+tri_matrix <- as.matrix(removeSparseTerms(tri_tdm, sparse = 0.999))
+quad_matrix <- as.matrix(removeSparseTerms(quad_tdm, sparse = 0.999))
+
+uni_matrix <- sort(rowSums(uni_matrix),decreasing=TRUE)
+bi_matrix <- sort(rowSums(bi_matrix),decreasing=TRUE)
+tri_matrix <- sort(rowSums(tri_matrix),decreasing=TRUE)
+quad_matrix <- sort(rowSums(quad_matrix),decreasing=TRUE)
+
+uni_matrix_df <- data.frame(word = names(uni_matrix),freq=uni_matrix, row.names = 1:length(uni_matrix))
+bi_matrix_df <- data.frame(word = names(bi_matrix),freq=bi_matrix, row.names = 1:length(bi_matrix))
+tri_matrix_df <- data.frame(word = names(tri_matrix),freq=tri_matrix, row.names = 1:length(tri_matrix))
+quad_matrix_df <- data.frame(word = names(quad_matrix),freq=quad_matrix, row.names = 1:length(quad_matrix))
+```
+
+# Save data frames into r-compressed files
+
+```{r}
+#1-grams
+write.csv(uni_matrix_df[uni_matrix_df$freq > 0,],"unigram.csv",row.names=F)
+unigram <- read.csv("unigram.csv",stringsAsFactors = F)
+saveRDS(unigram,"unigram.RData")
+
+
+#2-grams
+write.csv(bi_matrix_df[bi_matrix_df$freq > 1,],"bigram.csv",row.names=F)
+bigram <- read.csv("bigram.csv",stringsAsFactors = F)
+saveRDS(bigram,"bigram.RData")
+
+#3-grams
+write.csv(tri_matrix_df[tri_matrix_df$freq > 1,],"trigram.csv",row.names=F)
+trigram <- read.csv("trigram.csv",stringsAsFactors = F)
+saveRDS(trigram,"trigram.RData")
+
+#4-gram
+write.csv(quad_matrix_df[quad_matrix_df$freq > 1,],"quadgram.csv",row.names=F)
+quadgram <- read.csv("quadgram.csv",stringsAsFactors = F)
+saveRDS(quadgram,"quadgram.RData")
+```
+
+
+# End
